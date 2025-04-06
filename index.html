@@ -77,14 +77,12 @@
     }
 
     .product-card img {
-  width: calc(100% - 2rem); /* adds margin from both sides */
-  height: 180px; /* horizontal rectangle shape */
-  object-fit: contain; /* shows whole image without cropping */
-  display: block;
-  margin: 1rem auto; /* centers the image with top-bottom spacing */
-  background: #fff;
-  border-radius: 8px;
-}
+      display: block;
+      max-width: 90%;
+      max-height: 250px;
+      margin: 1rem auto 0.5rem auto;
+      object-fit: contain;
+    }
 
     .product-info {
       padding: 1rem;
@@ -132,8 +130,8 @@
     <input type="number" id="product-price" placeholder="Price (₹)" required />
     <input type="file" id="product-image" accept="image/*" required />
     <button type="submit">Add Product</button>
-    <button type="button" onclick="createCatalogLink()">Create Link</button>
-    <button type="button" onclick="shareCatalog()">Share Catalog</button>
+    <input type="file" id="import-json" accept=".json" />
+    <button type="button" onclick="importCatalogue()">Import Catalogue</button>
   </form>
 </div>
 
@@ -271,28 +269,41 @@
     };
   }
 
-  function createCatalogLink() {
-    const catalogLink = `${window.location.origin}${window.location.pathname}`;
-    navigator.clipboard.writeText(catalogLink).then(() => {
-      alert(`Link copied to clipboard!\n\n${catalogLink}`);
-    }).catch(err => {
-      alert(`Could not copy the link. Here's the link:\n\n${catalogLink}`);
-    });
-  }
+  function importCatalogue() {
+    const fileInput = document.getElementById("import-json");
+    const file = fileInput.files[0];
 
-  function shareCatalog() {
-    const link = `${window.location.origin}${window.location.pathname}`;
-    if (navigator.share) {
-      navigator.share({
-        title: "Product Catalog",
-        text: "Check out our product catalog:",
-        url: link
-      }).catch((error) => {
-        alert("Error sharing: " + error);
-      });
-    } else {
-      alert("Sharing not supported. Here's the link:\n" + link);
+    if (!file) {
+      alert("Please select a JSON file.");
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const importedProducts = JSON.parse(reader.result);
+        if (!Array.isArray(importedProducts)) {
+          throw new Error("Invalid format");
+        }
+
+        const tx = db.transaction(DB_STORE, "readwrite");
+        const store = tx.objectStore(DB_STORE);
+
+        importedProducts.forEach(product => {
+          delete product.id;
+          store.add(product);
+        });
+
+        tx.oncomplete = () => {
+          alert("Catalogue imported successfully!");
+          renderProducts();
+        };
+      } catch (err) {
+        alert("Invalid JSON file.");
+      }
+    };
+
+    reader.readAsText(file);
   }
 </script>
 
